@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AdvogAI.Jev — A cláusula certa, na hora em que a outra parte cita</title>
+  <meta name="description" content="Um programa que escuta a sua reunião de negociação e, quando a outra parte cita uma cláusula, mostra na sua tela o trecho exato do contrato. Sem procurar no PDF, sem parecer despreparado.">
+  <meta name="theme-color" content="#0b0b0c">
+  <link rel="icon" href="assets/favicon.png">
+  <style>
+    /* Mesma fonte e cores do app e do site de entrega (Inter embutida — licença em assets/OFL.txt) */
+    @font-face {
+      font-family: "Inter";
+      src: url("assets/inter.woff2") format("woff2");
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0b0b0c;
+      --surface: #141416;
+      --surface-2: #1c1c1f;
+      --border: #26262a;
+      --border-2: #37373d;
+      --text: #ececee;
+      --muted: #8a8a92;
+      --accent: #e4e4e7;
+      --accent-2: #ffffff;
+      --accent-ink: #0b0b0c;
+      --gold: #c9a96a;
+      --gold-2: #dcc08a;
+      --gold-ink: #1d1606;
+      --sage: #9fcfb3;
+      --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-behavior: smooth; }
+    #preco { scroll-margin-top: 24px; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+    body {
+      margin: 0;
+      background: radial-gradient(900px 420px at 50% -120px, #1d1b17 0%, transparent 70%), var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15.5px;
+      line-height: 1.6;
+      letter-spacing: -0.006em;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 28px 16px 40px; }
+    .centro { text-align: center; }
+    section { margin-top: 72px; }
+
+    .top { display: flex; justify-content: center; }
+    .top div { display: inline-flex; align-items: center; gap: 10px; }
+    .logo { width: 40px; height: 40px; }
+    .brand { margin: 0; font-weight: 700; font-size: 14.5px; line-height: 1.25; }
+    .brand span { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+
+    .selo { display: inline-block; margin: 34px 0 0; padding: 4px 12px; border-radius: 99px; border: 1px solid #5c4d2c; color: var(--gold-2); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+    h1 { font-size: clamp(32px, 6.6vw, 58px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.07; margin: 16px auto 0; max-width: 880px; }
+    h1 em, h2 em { font-style: normal; color: var(--gold); }
+    h2 { font-size: clamp(21px, 4.2vw, 30px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; margin: 0 0 10px; }
+    .lead { color: #b9b9c0; margin: 18px auto 0; max-width: 640px; font-size: 17px; }
+    .sub { color: var(--muted); margin: 0 auto; max-width: 620px; }
+
+    .cta { margin: 26px auto 0; max-width: 420px; text-align: center; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      background: var(--accent); border: 1px solid var(--accent); color: var(--accent-ink);
+      border-radius: 12px; padding: 16px 18px; font-weight: 800; font-size: 16.5px;
+      text-decoration: none; cursor: pointer; transition: background .15s, transform .15s;
+    }
+    .btn:hover { background: var(--accent-2); border-color: var(--accent-2); }
+    .btn:active { transform: scale(.98); }
+    .icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .secure { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+    .secure .icon { width: 14px; height: 14px; color: var(--gold); }
+
+    /* ---------- Tela do programa (desenhada em HTML) ---------- */
+    .tela { margin: 40px 0 0; border-radius: 16px; border: 1px solid var(--border-2); background: #0e0e10; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); overflow: hidden; text-align: left; }
+    .tela-topo { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+    .tela-topo img { width: 20px; height: 20px; }
+    .tela-topo b { color: var(--text); }
+    .tela-topo .ao-vivo { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+    .tela-topo .ao-vivo i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(228, 228, 231, .12); }
+    .tela-corpo { display: grid; grid-template-columns: 190px 1fr 190px; gap: 14px; padding: 14px; }
+    .col { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; font-size: 12px; }
+    .col h4 { margin: 0 0 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .col p { margin: 0 0 6px; padding: 6px 8px; border-radius: 7px; background: var(--bg); border: 1px solid var(--border); line-height: 1.4; color: #cfcfd4; }
+    .col p.agora { border-color: #5c4d2c; color: var(--text); }
+    .meio { display: grid; gap: 10px; align-content: center; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border-2); }
+    .chip small { color: var(--gold-2); font-weight: 600; margin-left: 4px; }
+    .card-doc { padding: 16px 18px; border-radius: 14px; background: linear-gradient(180deg, #211c12, var(--surface) 70%); border: 1px solid #5c4d2c; }
+    .card-doc .rot { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--gold); }
+    .card-doc .orig { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+    .card-doc h3 { margin: 4px 0 8px; font-size: clamp(18px, 2.4vw, 24px); letter-spacing: -0.02em; }
+    .card-doc .trecho { padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid #3a3222; font-size: 13.5px; line-height: 1.6; color: #ecebe6; }
+    .card-doc mark { background: rgba(201, 169, 106, .3); color: #fff4dc; border-radius: 3px; padding: 0 2px; }
+    .card-doc .acoes { display: flex; gap: 8px; margin-top: 10px; }
+    .card-doc .acoes span { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface-2); }
+    .card-doc .acoes span:first-child { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+    .tela figcaption { padding: 10px 14px 14px; color: var(--muted); font-size: 12.5px; text-align: center; }
+    @media (max-width: 760px) { .tela-corpo { grid-template-columns: 1fr; } .col.voce { display: none; } }
+
+    /* Dor */
+    .lista { list-style: none; margin: 18px auto 0; padding: 0; max-width: 660px; display: grid; gap: 10px; text-align: left; }
+    .lista li { display: flex; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+    .lista .icon { color: var(--gold); margin-top: 3px; }
+
+    /* Como funciona */
+    .como { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 22px; text-align: left; }
+    .passo { padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+    .passo .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #1b170f; border: 1px solid #5c4d2c; color: var(--gold); font-weight: 700; font-size: 13px; }
+    .passo h3 { margin: 12px 0 4px; font-size: 15.5px; }
+    .passo p { margin: 0; color: var(--muted); font-size: 14px; }
+    @media (max-width: 760px) { .como { grid-template-columns: 1fr; } }
+
+    /* Blocos lado a lado */
+    .bloco {
+      display: grid; grid-template-columns: 1fr 380px; gap: 36px; align-items: center;
+      padding: 32px; border-radius: 20px; background: linear-gradient(135deg, #1a1812, var(--surface) 60%); border: 1px solid #3a3222;
+    }
+    .bloco.cinza { background: linear-gradient(135deg, #19191c, var(--surface) 60%); border-color: var(--border-2); }
+    .bloco h2 { margin-top: 12px; }
+    .bloco .sub { margin: 0; max-width: none; }
+    .etiqueta { display: inline-block; padding: 4px 11px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+    .bloco.cinza .etiqueta { background: var(--accent); color: var(--accent-ink); }
+    .itens { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+    .itens li { display: flex; gap: 10px; color: #c9c9cf; }
+    .itens .icon { color: var(--gold); margin-top: 3px; }
+    .itens b { color: var(--text); }
+    .toasts { display: grid; gap: 12px; }
+    .toast-win { padding: 12px 14px 14px; border-radius: 10px; background: #2b2b2e; border: 1px solid #3c3c42; box-shadow: 0 18px 40px rgba(0, 0, 0, .5); font-family: "Segoe UI", var(--sans); text-align: left; }
+    .toast-win.doc { border-color: #5c4d2c; transform: translateX(-14px); }
+    .toast-app { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #b9b9c0; margin-bottom: 8px; }
+    .toast-app img { width: 16px; height: 16px; }
+    .toast-app span { margin-left: auto; color: #85858c; }
+    .toast-win b { display: block; font-size: 14.5px; font-weight: 600; }
+    .toast-win.doc b { color: var(--gold-2); }
+    .toast-win p { margin: 3px 0 0; font-size: 13.5px; color: #d2d2d7; line-height: 1.45; }
+    .contra { padding: 18px; border-radius: 14px; background: linear-gradient(180deg, #1d1d20, var(--surface) 70%); border: 1px solid #45454c; }
+    .contra .rot { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+    .contra h3 { margin: 4px 0 8px; font-size: 20px; letter-spacing: -0.02em; }
+    .contra p { margin: 0; font-size: 14px; color: #dcdce0; }
+    @media (max-width: 800px) {
+      .bloco { grid-template-columns: 1fr; padding: 22px 18px; gap: 24px; }
+      .toast-win.doc { transform: none; }
+    }
+
+    /* O que vem */
+    .recebe { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin: 22px 0 0; padding: 0; list-style: none; }
+    .recebe li { display: flex; gap: 10px; }
+    .recebe .icon { color: var(--gold); margin-top: 3px; }
+    .recebe b { display: block; }
+    .recebe span { color: var(--muted); font-size: 14px; }
+    @media (max-width: 760px) { .recebe { grid-template-columns: 1fr; } }
+
+    /* Preço */
+    .preco { max-width: 440px; margin: 22px auto 0; padding: 28px 22px 24px; text-align: center; border-radius: 18px; background: linear-gradient(180deg, #1d1a14, var(--surface)); border: 1px solid #5c4d2c; }
+    .preco .valor { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; margin: 4px 0 2px; }
+    .preco .valor small { font-size: 16px; font-weight: 600; color: var(--muted); }
+    .preco p { margin: 0; color: var(--muted); font-size: 14px; }
+    .preco .cta { margin-top: 18px; }
+
+    .faq { max-width: 700px; margin: 22px auto 0; display: grid; gap: 8px; }
+    .faq details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 16px; }
+    .faq summary { cursor: pointer; font-weight: 600; }
+    .faq p { margin: 8px 0 0; color: var(--muted); font-size: 14.5px; }
+
+    footer { color: var(--muted); font-size: 12px; margin-top: 60px; text-align: center; }
+    footer p { margin: 0 0 4px; }
+
+    /* Checkout Pix (janela por cima da página) */
+    .pix { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .75); overflow-y: auto; }
+    .pix-box {
+      position: relative; width: 100%; max-width: 400px; padding: 26px 20px 22px; text-align: center;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 30px 70px rgba(0, 0, 0, .6);
+    }
+    .pix-box h2 { margin: 0 0 4px; }
+    .pix-box .lead { font-size: 14.5px; margin-top: 0; }
+    .pix-x { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+    .pix-x:hover { color: var(--text); background: var(--surface-2); }
+    .pix-licenca { display: inline-block; margin: 0 0 10px; padding: 3px 10px; border-radius: 99px; border: 1px solid #5c4d2c; background: #1b170f; color: var(--gold-2); font-size: 12px; font-weight: 700; }
+    .pix-preco { color: var(--gold); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 10px 0 14px; }
+    .pix-campo {
+      display: block; width: 100%; margin: 0 0 12px; padding: 13px 14px;
+      background: var(--bg); border: 1px solid var(--border-2); border-radius: 10px; color: var(--text); font: inherit; font-size: 15.5px;
+    }
+    .pix-campo:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .pix .btn[disabled] { opacity: .6; cursor: wait; }
+    .pix-erro { color: #f08a7e; font-size: 13.5px; margin: 10px 0 0; }
+    .pix-qr { display: block; width: 220px; height: 220px; margin: 14px auto; padding: 10px; background: #fff; border-radius: 12px; }
+    .pix-codigo {
+      display: block; width: 100%; height: 68px; margin: 0 0 10px; padding: 9px 10px; resize: none;
+      background: var(--bg); border: 1px solid var(--border-2); border-radius: 10px; color: var(--muted); font: 12px/1.4 ui-monospace, Consolas, monospace; word-break: break-all;
+    }
+    .pix-espera { display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 13.5px; margin: 14px 0 0; }
+    .giro { width: 15px; height: 15px; flex: none; border-radius: 50%; border: 2px solid var(--border-2); border-top-color: var(--gold); animation: giro .8s linear infinite; }
+    @keyframes giro { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  </svg>
+
+  <main class="page">
+    <div class="top">
+      <div>
+        <img class="logo" src="assets/logo.png" alt="">
+        <p class="brand">AdvogAI.Jev <span>Assistente de negociação para advogados</span></p>
+      </div>
+    </div>
+
+    <!-- Abertura -->
+    <div class="centro">
+      <span class="selo">Para societário e contratos</span>
+      <h1>A outra parte citou a cláusula 7.2. <em>Ela já está na sua tela.</em></h1>
+      <p class="lead">O AdvogAI escuta a reunião de negociação e, no instante em que alguém cita um ponto do contrato, mostra o trecho exato — sem
+        rolar PDF, sem Ctrl+F, sem aquele silêncio que entrega vantagem ao outro lado.</p>
+    </div>
+
+    <figure class="tela" aria-label="Ilustração da tela do AdvogAI durante uma reunião">
+      <div class="tela-topo"><img src="assets/favicon.png" alt=""> <b>AdvogAI.Jev</b> · Reunião <span class="ao-vivo"><i></i> Ouvindo</span></div>
+      <div class="tela-corpo">
+        <div class="col voce">
+          <h4>Você</h4>
+          <p>Podemos seguir para a parte de rescisão?</p>
+          <p>A proposta de vocês era reduzir o aviso prévio.</p>
+        </div>
+        <div class="meio">
+          <div class="chips"><span class="chip">Contrato de consultoria — Alfa x Beta <small>Alfa Construtora</small></span><span class="chip">1º Aditivo <small>Alfa Construtora</small></span></div>
+          <div class="card-doc">
+            <p class="rot">Cláusula citada</p>
+            <p class="orig">Contrato de consultoria — Alfa x Beta</p>
+            <h3>Cláusula 7.2 — Da rescisão e da multa</h3>
+            <div class="trecho">7.2 A rescisão sem justa causa antes de decorridos 24 (vinte e quatro) meses de vigência sujeitará a parte que lhe der causa ao pagamento de <mark>multa</mark> equivalente a <mark>20%</mark> (vinte por cento) do valor remanescente do contrato.</div>
+            <div class="acoes"><span>Ver no documento</span><span>Copiar trecho</span></div>
+          </div>
+        </div>
+        <div class="col">
+          <h4>Outra parte</h4>
+          <p>A gente leu a minuta de vocês.</p>
+          <p class="agora">Na cláusula sete ponto dois vocês colocaram 20% de multa, isso é muito.</p>
+        </div>
+      </div>
+      <figcaption>A outra parte falou “cláusula sete ponto dois” e o trecho apareceu antes de ela terminar a frase.</figcaption>
+    </figure>
+
+    <div class="cta">
+      <a class="btn" href="#preco">Quero o AdvogAI <svg class="icon"><use href="#i-seta"/></svg></a>
+      <p class="secure">Programa para Windows · 6 meses de acesso · pagamento via Pix</p>
+    </div>
+
+    <!-- Dor -->
+    <section class="centro">
+      <h2>Ninguém confia só na memória para um <em>contrato de 60 páginas</em></h2>
+      <p class="sub">E a reunião não espera você achar o parágrafo:</p>
+      <ul class="lista">
+        <li><svg class="icon"><use href="#i-check"/></svg><span>A outra parte diz “como está na cláusula 12” e você passa segundos rolando o PDF enquanto todos olham para você.</span></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><span>Alguém cita “aquela multa de rescisão” sem dar o número, e você precisa lembrar onde ela está e o que diz exatamente.</span></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><span>Você tem os três contratos do cliente abertos e não sabe de qual deles estão falando.</span></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><span>A demora parece despreparo — e dá ao outro lado a vantagem psicológica na negociação.</span></li>
+      </ul>
+    </section>
+
+    <!-- Como funciona -->
+    <section class="centro">
+      <h2>Como funciona</h2>
+      <div class="como">
+        <div class="passo"><span class="n">1</span><h3>Você cola os contratos</h3><p>Copia o texto do Word ou do PDF e cola. O AdvogAI organiza em cláusulas, itens e parágrafos sozinho, com a etiqueta do cliente.</p></div>
+        <div class="passo"><span class="n">2</span><h3>Escolhe os da reunião</h3><p>Antes de começar, marca quais documentos vão ser discutidos. O AdvogAI só procura neles.</p></div>
+        <div class="passo"><span class="n">3</span><h3>Ele acha na hora</h3><p>Escuta o Meet, Zoom ou Teams. Quando citam um ponto, pelo número ou pelo assunto, o trecho exato aparece na tela.</p></div>
+      </div>
+    </section>
+
+    <!-- Contra-argumentos + notificações -->
+    <section class="bloco cinza">
+      <div>
+        <span class="etiqueta">Além da cláusula</span>
+        <h2>E o seu <em>contra-argumento</em>, pronto na hora certa.</h2>
+        <p class="sub">Cadastre as objeções que você mais ouve na mesa — “essa multa é abusiva”, “precisamos de mais prazo”, “vou levar à diretoria” —
+          com a sua resposta. Quando a outra parte fala algo parecido, o card aparece. Quando ela pede a minuta, o link já está lá para copiar.</p>
+        <ul class="itens">
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>Já vem com exemplos</b> de societário e contratos para você adaptar.</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>Notificação no Windows</b>: aparece por cima até da janela da reunião.</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>Some sozinho</b> se você compartilhar a tela, para o outro lado não ver nada.</span></li>
+        </ul>
+      </div>
+      <div class="toasts" aria-label="Ilustração dos cards e das notificações">
+        <div class="toast-win doc">
+          <div class="toast-app"><img src="assets/favicon.png" alt=""> AdvogAI.Jev <span>agora</span></div>
+          <b>Cláusula 8.1 · Contrato Alfa x Beta</b>
+          <p>👉 Clique para copiar o trecho<br>A responsabilidade total da CONTRATADA por perdas e danos fica limitada a 12 meses de faturamento…</p>
+        </div>
+        <div class="contra">
+          <p class="rot">Contra-argumento</p>
+          <h3>A multa é abusiva</h3>
+          <p>A cláusula penal foi calibrada pelo prejuízo real da rescisão antecipada. Se o ponto é o valor, posso propor um escalonamento proporcional ao tempo cumprido…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sigilo -->
+    <section class="bloco">
+      <div>
+        <span class="etiqueta">Sigilo</span>
+        <h2>Os contratos do seu cliente <em>ficam no seu computador.</em></h2>
+        <p class="sub">Os documentos são guardados criptografados pelo próprio Windows, só na sua máquina. Não sobem para servidor nosso, não ficam em nuvem de terceiros e não aparecem para ninguém.</p>
+        <ul class="itens">
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>Criptografia do Windows</b> (a mesma que protege as senhas do sistema).</span></li>
+          <li><svg class="icon"><use href="#i-lock"/></svg><span>Na reunião, só vão para a IA <b>os títulos das cláusulas e trechos curtos</b> do ponto citado — com a sua própria chave.</span></li>
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>Nenhum robô entra na reunião</b>: ele só escuta o áudio no seu computador.</span></li>
+        </ul>
+      </div>
+      <div class="toasts">
+        <div class="toast-win">
+          <div class="toast-app"><img src="assets/favicon.png" alt=""> Documentos <span>criptografados</span></div>
+          <b>Construtora Alfa · 3 documentos</b>
+          <p>Contrato de consultoria · 1º Aditivo · Acordo de confidencialidade</p>
+        </div>
+        <div class="toast-win">
+          <div class="toast-app"><img src="assets/favicon.png" alt=""> Documentos <span>criptografados</span></div>
+          <b>Holding Gama · 2 documentos</b>
+          <p>Acordo de quotistas · Contrato social consolidado</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- O que vem -->
+    <section>
+      <h2 class="centro">O que você recebe</h2>
+      <ul class="recebe">
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>O programa para Windows</b><span>Chave de acesso para um computador, válida por 6 meses.</span></div></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>Biblioteca de documentos por cliente</b><span>Cole o texto, ele organiza em cláusulas e etiqueta pelo cliente.</span></div></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>Cláusula citada na hora</b><span>Pelo número (“cláusula sétima”, “7.2”) ou pelo assunto (“a multa”, “o reajuste”).</span></div></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>Leitor com índice e busca</b><span>Abre o contrato exatamente no ponto citado, com as palavras destacadas.</span></div></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>7 objeções e 4 sinais de acordo de exemplo</b><span>Prontos para você adaptar à sua prática.</span></div></li>
+        <li><svg class="icon"><use href="#i-check"/></svg><div><b>Funciona com Meet, Zoom, Teams e WhatsApp</b><span>Pelo navegador ou pelos programas instalados.</span></div></li>
+      </ul>
+    </section>
+
+    <!-- Preço -->
+    <section class="centro" id="preco">
+      <h2>Quanto custa</h2>
+      <div class="preco">
+        <p>Chave de acesso ao AdvogAI.Jev</p>
+        <div class="valor">R$ 97 <small>à vista no Pix</small></div>
+        <p><b style="color:var(--text)">6 meses de acesso</b> · pagamento único, sem mensalidade.</p>
+        <div class="cta">
+          <a class="btn" href="#checkout" data-comprar>Comprar agora <svg class="icon"><use href="#i-seta"/></svg></a>
+        </div>
+        <p style="margin-top:12px;font-size:13px">Você tem 7 dias para desistir e receber o dinheiro de volta (Código de Defesa do Consumidor).</p>
+      </div>
+    </section>
+
+    <!-- Perguntas -->
+    <section>
+      <h2 class="centro">Perguntas frequentes</h2>
+      <div class="faq">
+        <details><summary>Como recebo depois de pagar?</summary><p>Depois da confirmação do Pix, você fala com a gente pelo WhatsApp (o botão aparece na tela) e recebe a chave de acesso e o link para baixar o programa.</p></details>
+        <details><summary>Posso enviar o PDF ou um link do documento?</summary><p>O AdvogAI precisa do texto: você abre o documento, copia (Ctrl+A, Ctrl+C) e cola. Ele arruma as quebras de linha do PDF sozinho. Também aceita arquivos .txt. PDF escaneado (imagem) precisa de OCR antes.</p></details>
+        <details><summary>E se a outra parte não falar o número da cláusula?</summary><p>Ele entende pelo assunto: “a multa de rescisão”, “o que diz sobre o reajuste”, “o limite de responsabilidade”. A IA escolhe o trecho entre os candidatos do documento.</p></details>
+        <details><summary>Os documentos dos meus clientes ficam seguros?</summary><p>Ficam só no seu computador, criptografados pelo Windows. Durante a reunião, só os títulos das cláusulas e trechos curtos do ponto citado vão para a IA, com a sua chave. Nada passa pelos nossos servidores.</p></details>
+        <details><summary>A outra parte percebe?</summary><p>Nenhum robô entra na reunião: o AdvogAI só escuta o áudio no seu computador. Mesmo assim, recomendamos avisar que a conversa está sendo transcrita.</p></details>
+        <details><summary>E se eu compartilhar a tela na reunião?</summary><p>O AdvogAI detecta e entra em pausa sozinho: some da tela, não envia nada e volta quando você para de compartilhar.</p></details>
+        <details><summary>Por quanto tempo vale?</summary><p>A chave vale 6 meses a partir da compra. Perto do fim, você pode renovar para continuar usando.</p></details>
+        <details><summary>Funciona no Mac ou no celular?</summary><p>Não. Por enquanto é só para computador com Windows e Google Chrome.</p></details>
+        <details><summary>Tem algum custo além da chave?</summary><p>Só o crédito da IA: você coloca US$ 5 na sua conta do OpenRouter (o programa mostra o passo a passo). Cada decisão gasta uma fração de centavo, então esse crédito rende muitas reuniões.</p></details>
+      </div>
+      <div class="cta">
+        <a class="btn" href="#preco">Quero o AdvogAI <svg class="icon"><use href="#i-seta"/></svg></a>
+      </div>
+    </section>
+
+    <footer>
+      <p>Programa para computador com Windows + Google Chrome.</p>
+      <p>© 2026 AdvogAI.Jev</p>
+    </footer>
+  </main>
+
+  <div class="pix" id="pix" role="dialog" aria-modal="true" aria-labelledby="pixTitulo" hidden>
+    <div class="pix-box">
+      <button class="pix-x" type="button" aria-label="Fechar" data-fechar>×</button>
+
+      <form id="pixPasso1" novalidate>
+        <p class="pix-licenca">Licença de 6 meses</p>
+        <h2 id="pixTitulo">Chave de acesso</h2>
+        <p class="lead">AdvogAI.Jev — Assistente de negociação para advogados</p>
+        <!-- O valor cobrado de verdade é o PRECO da função pix (..\Supabase\Funcoes\pix\index.ts) -->
+        <p class="pix-preco">R$ 97,00</p>
+        <input class="pix-campo" id="pixNome" type="text" autocomplete="name" placeholder="Seu nome" aria-label="Seu nome" required>
+        <input class="pix-campo" id="pixEmail" type="email" inputmode="email" autocomplete="email" placeholder="Seu melhor e-mail" aria-label="Seu e-mail" required>
+        <input class="pix-campo" id="pixTel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Seu WhatsApp com DDD" aria-label="Seu WhatsApp com DDD" required>
+        <button class="btn" type="submit" id="pixGerar">GERAR PIX</button>
+        <p class="pix-erro" id="pixErro" role="alert" hidden></p>
+        <p class="secure">
+          <svg class="icon"><use href="#i-lock"/></svg>
+          Pagamento processado pelo Mercado Pago
+        </p>
+      </form>
+
+      <div id="pixPasso2" hidden>
+        <h2>Pague com Pix</h2>
+        <p class="lead">Abra o app do seu banco e escaneie o QR Code, ou use o Pix Copia e Cola.</p>
+        <img class="pix-qr" id="pixQr" alt="QR Code do Pix">
+        <textarea class="pix-codigo" id="pixCodigo" readonly aria-label="Código Pix Copia e Cola"></textarea>
+        <button class="btn" type="button" id="pixCopiar">COPIAR CÓDIGO PIX</button>
+        <p class="pix-espera"><span class="giro"></span> Aguardando o pagamento… a tela muda sozinha.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Botões de compra → Pix do Mercado Pago, pela função "pix" do Supabase
+       (..\Supabase\Funcoes\pix). Quando o pagamento é aprovado, vai para obrigado.html. */
+    (function () {
+      var API = 'https://SEU-PROJETO.supabase.co/functions/v1/pix';
+
+      // Código da pressel: chega no link (?d=...) e fica guardado para as próximas visitas
+      var dispositivo = new URLSearchParams(location.search).get('d') || '';
+      try {
+        if (dispositivo) localStorage.setItem('advo_disp', dispositivo);
+        else dispositivo = localStorage.getItem('advo_disp') || '';
+      } catch (e) {}
+
+      var janela = document.getElementById('pix');
+      var passo1 = document.getElementById('pixPasso1');
+      var passo2 = document.getElementById('pixPasso2');
+      var nome = document.getElementById('pixNome');
+      var email = document.getElementById('pixEmail');
+      var tel = document.getElementById('pixTel');
+      var gerar = document.getElementById('pixGerar');
+      var erro = document.getElementById('pixErro');
+      var qr = document.getElementById('pixQr');
+      var codigo = document.getElementById('pixCodigo');
+      var copiar = document.getElementById('pixCopiar');
+      var pedido = null;   // Pix já gerado nesta visita: reabrir a janela mostra o mesmo
+      var espera = null;
+
+      function abrir(e) {
+        e.preventDefault();
+        janela.hidden = false;
+        document.body.style.overflow = 'hidden';
+        if (pedido) acompanhar(); else nome.focus();
+      }
+
+      function fechar() {
+        janela.hidden = true;
+        document.body.style.overflow = '';
+        clearTimeout(espera);
+      }
+
+      function mostrarErro(msg) {
+        erro.textContent = msg;
+        erro.hidden = false;
+      }
+
+      function acompanhar() {
+        clearTimeout(espera);
+        espera = setTimeout(function () {
+          fetch(API + '?id=' + pedido.id)
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.pago) { location.href = 'obrigado.html?id=' + pedido.id; return; }
+              if (d.status === 'cancelled' || d.status === 'rejected') {
+                pedido = null;
+                passo2.hidden = true;
+                passo1.hidden = false;
+                mostrarErro('Esse Pix expirou. Gere um novo para continuar.');
+                return;
+              }
+              if (!janela.hidden) acompanhar();
+            })
+            .catch(function () { if (!janela.hidden) acompanhar(); });
+        }, 4000);
+      }
+
+      passo1.addEventListener('submit', function (e) {
+        e.preventDefault();
+        erro.hidden = true;
+        var digitos = tel.value.replace(/\D/g, '');
+        if (nome.value.trim().length < 2) { mostrarErro('Digite o seu nome.'); nome.focus(); return; }
+        if (!email.checkValidity() || !email.value.trim()) { mostrarErro('Digite um e-mail válido.'); email.focus(); return; }
+        if (digitos.length < 10 || digitos.length > 13) { mostrarErro('Digite o seu WhatsApp com DDD.'); tel.focus(); return; }
+
+        gerar.disabled = true;
+        gerar.textContent = 'GERANDO PIX…';
+        fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome: nome.value.trim(), email: email.value.trim(), telefone: digitos, dispositivo: dispositivo })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.id) throw new Error(d.erro);
+            pedido = d;
+            qr.src = 'data:image/png;base64,' + d.qrcode;
+            codigo.value = d.copiaecola;
+            passo1.hidden = true;
+            passo2.hidden = false;
+            acompanhar();
+          })
+          .catch(function (err) {
+            mostrarErro((err && err.message) || 'Não foi possível gerar o Pix. Tente de novo.');
+          })
+          .then(function () {
+            gerar.disabled = false;
+            gerar.textContent = 'GERAR PIX';
+          });
+      });
+
+      copiar.addEventListener('click', function () {
+        function ok() {
+          copiar.textContent = 'CÓDIGO COPIADO ✓';
+          setTimeout(function () { copiar.textContent = 'COPIAR CÓDIGO PIX'; }, 2500);
+        }
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(codigo.value).then(ok, function () { codigo.select(); document.execCommand('copy'); ok(); });
+        } else {
+          codigo.select();
+          document.execCommand('copy');
+          ok();
+        }
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-comprar]'), function (a) {
+        a.addEventListener('click', abrir);
+      });
+      janela.querySelector('[data-fechar]').addEventListener('click', fechar);
+      janela.addEventListener('click', function (e) { if (e.target === janela) fechar(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !janela.hidden) fechar(); });
+    })();
+  </script>
+</body>
+</html>
